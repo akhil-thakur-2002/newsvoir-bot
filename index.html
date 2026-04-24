@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Newsvoir</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+body { background: transparent; margin: 0; padding: 0; }
+#chat-fab { position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: #2563eb; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 9999; transition: transform 0.2s, background 0.2s; box-shadow: 0 4px 16px rgba(37,99,235,0.35); }
+#chat-fab:hover { transform: scale(1.07); background: #3b82f6; }
+#chat-fab svg { width: 24px; height: 24px; fill: white; }
+#notif-dot { position: absolute; top: -2px; right: -2px; width: 11px; height: 11px; background: #e74c3c; border-radius: 50%; border: 2px solid white; }
+#chat-window { position: fixed; bottom: 92px; right: 24px; width: 340px; background: #ffffff; border: 0.5px solid rgba(0,0,0,0.1); border-radius: 18px; display: flex; flex-direction: column; overflow: hidden; z-index: 9998; transition: opacity 0.2s, transform 0.2s; transform-origin: bottom right; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+#chat-window.hidden { opacity: 0; pointer-events: none; transform: scale(0.92); }
+.chat-header { background: #2563eb; padding: 14px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.avatar-circle { width: 38px; height: 38px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 500; color: white; flex-shrink: 0; }
+.header-info p { font-size: 14px; font-weight: 500; color: white; line-height: 1.2; }
+.header-info span { font-size: 11px; color: rgba(255,255,255,0.7); }
+.online-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; display: inline-block; margin-right: 4px; }
+#chat-body { padding: 14px; display: flex; flex-direction: column; gap: 8px; height: 340px; overflow-y: auto; scroll-behavior: smooth; }
+#chat-body::-webkit-scrollbar { width: 4px; }
+#chat-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+.msg { max-width: 82%; font-size: 13px; line-height: 1.5; padding: 9px 13px; border-radius: 13px; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.msg.bot { background: #f1f5f9; color: #1e293b; align-self: flex-start; border-bottom-left-radius: 3px; }
+.msg.user { background: #2563eb; color: white; align-self: flex-end; border-bottom-right-radius: 3px; }
+.typing-wrap { align-self: flex-start; background: #f1f5f9; border-radius: 13px; border-bottom-left-radius: 3px; padding: 11px 15px; display: flex; gap: 4px; align-items: center; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; animation: bounce 1s infinite; }
+.dot:nth-child(2) { animation-delay: .15s; }
+.dot:nth-child(3) { animation-delay: .3s; }
+@keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+#input-row { padding: 10px 12px; border-top: 0.5px solid rgba(0,0,0,0.08); display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+#txt-in { flex: 1; padding: 9px 14px; border: 0.5px solid #cbd5e1; border-radius: 22px; font-size: 13px; background: #f8fafc; color: #1e293b; outline: none; font-family: inherit; }
+#txt-in:focus { border-color: #2563eb; }
+#send-btn { width: 34px; height: 34px; border-radius: 50%; background: #2563eb; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s; }
+#send-btn:hover { background: #3b82f6; }
+#send-btn svg { width: 15px; height: 15px; fill: white; }
+.hidden { display: none !important; }
+@media (max-width: 480px) { #chat-window { width: calc(100vw - 24px); right: 12px; bottom: 80px; } #chat-fab { bottom: 16px; right: 16px; } }
+</style>
+</head>
+<body>
+
+<button id="chat-fab" onclick="toggleChat()">
+  <svg id="icon-open" viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+  <svg id="icon-close" class="hidden" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+  <span id="notif-dot"></span>
+</button>
+
+<div id="chat-window" class="hidden">
+  <div class="chat-header">
+    <div class="avatar-circle"><img src="newsvoir profile.jpg" onerror="this.style.display='none';this.parentNode.innerHTML='N'" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" /></div>
+    <div class="header-info">
+      <p>Newsvoir</p>
+      <span><span class="online-dot"></span>I am here to assist you</span>
+    </div>
+  </div>
+  <div id="chat-body"></div>
+  <div id="input-row">
+    <input type="text" id="txt-in" placeholder="Type here..." onkeydown="if(event.key==='Enter')handleInput()"/>
+    <button id="send-btn" onclick="handleInput()">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+const GREETINGS = ['hi','hello','hey','hii','hiii','hiiii','helo','heya','hiya','howdy','sup','whatsup','wassup','watsup','yo','hola','namaste','namaskar','salut','bonjour','ciao','salam','salaam','greetings','good morning','good afternoon','good evening','good day','gm','morning','afternoon','evening','hi there','hello there','hey there','hi anku','hello anku','hey anku','hi bot','hello bot','anyone there','you there','is anyone there','are you there','knock knock','hello hello','hi hi','heyy','heyyy','hiyyy','hii there','helloo','hellooo','hayy','hayyy','heyy there','howdy there','whatsapp','wassap','wazup','wazzup','what up','sup bro','yo bro','hi bro','hello bro','hey bro','bhai','hello bhai','hi bhai','hey bhai','kya haal','kya hal','kaise ho','kaisa chal rha','kaisa chal raha','kya chal raha','haal chaal','theek ho','namastey','namaskar ji','hello ji','hi ji','hanji','haanji','hey ji','sat sri akal','adaab','adab','pranam','namskar','helloo ji','hii ji','heyy ji','hello dear','hi dear','hey dear','greetings dear','good morning dear','good evening dear','start','begin','lets start','lets begin','start karo','shuru karo','chalao','chalo','chalu karo','yoo','ayo','oye','oye hello','oye hi','arrey','arrey hi','bolo','bolo ji','kaho','kaho ji','haan bolo','test','testing','ping','check','anyone','connect'];
+
+
+const PRICING_KW = [
+  'price','pricing','cost','costing','charges','charge','fee','fees','rate','rates','tariff',
+  'quote','quotation','estimate','package','packages','plan','plans','budget','affordable',
+  'reasonable','cheap','expensive','sasta','mehnga','price list','rate list','fee structure',
+  'price detail','cost detail','pricing detail','package detail','plan detail','price info',
+  'price policy','pricing policy','cost structure','price strategy','pricing strategy',
+  'how much does it cost','how much will it cost','how much do you charge',
+  'what is the price','what is the cost','what are the charges','what are the fees',
+  'what are the rates','what is your pricing','tell me the price','tell me the cost',
+  'can you share the price','can you tell me the price','what will be the cost',
+  'what would be the cost','how much is it','is it free','is it paid','is it affordable',
+  'pricing plan','pricing model','pricing structure','cost breakdown','fee breakdown',
+  'kitna','kitne','kitni','kitna paisa','kitne paise','kitna lagega','kya rate hai',
+  'kya price hai','kya cost hai','price kya hai','pricing kya hai','cost kya hai',
+  'charges kya hain','rate kya hai','fees kya hain','bata do price','price batao',
+  'cost batao','charges batao','rate batao','fees batao','kitne mein','kitne ka',
+  'pricing samjhao','cost samjhao','charges samjhao','kitna bill aayega','bill kitna hoga',
+  'kitna dena hoga','kitna pay karna','payment kitna','subscription cost','subscription fee',
+  'monthly cost','annual cost','yearly cost','per release cost','introductory offer',
+  'special offer','discount','offer kya hai','koi offer hai','koi discount hai',
+  'offer chal raha hai','current offer','latest offer','share price detail',
+  'pricing ke baare mein batao','cost ke baare mein batao','rate ke baare mein batao',
+  'kya paid service hai','kitna investment chahiye','kitna kharch aayega',
+  'how much investment','how much to spend','what is the investment',
+  'plan kya hai','package kya hai','kya plan available hai','konsa plan lein',
+  'best plan kaunsa hai','starter plan','basic plan','premium plan','enterprise plan',
+  'corporate plan','agency plan','pr agency pricing','corporate pricing',
+  'bulk pricing','volume discount','annual plan','monthly plan',
+  'kya free trial hai','free trial available hai','trial available hai',
+  'pehle try kar sakte hain','kya demo milega','demo available hai'
+];
+
+const RELEASES_KW = [
+  'release','releases','press release','press releases','launch','launched','launches',
+  'new launch','product launch','service launch','campaign','campaigns','announcement',
+  'announcements','latest news','recent news','new update','update','updates',
+  'new service','new product','new offering','offering','offerings','latest','recent',
+  'whats new','kya naya hai','naya kya hai','new kya hai','latest kya hai',
+  'launch kya tha','launch kya hai','kya launch kiya','kya launch hua',
+  'kya announce kiya','kya announcement hai','kya releases hain','release kya hai',
+  'press release kya hai','naya release','new release','latest release','recent release',
+  'tell me about releases','release detail','release info','launch detail','launch info',
+  'campaign detail','new campaign','latest campaign','announcement detail',
+  'new announcement','latest announcement','koi naya update','koi naya release',
+  'kuch naya batao','naya batao','latest batao','update batao',
+  'kya chal raha company mein','company mein kya naya hai','company news','company update',
+  'what has been released','what was launched','what are the latest releases',
+  'what are the new services','kya new aaya','nayi cheez kya hai',
+  'recent announcements','recent campaigns','recent launches','recent press releases',
+  'newsvoir latest','newsvoir news','newsvoir updates','newsvoir announcements',
+  'kya kuch naya launch hua','kya kuch announce kiya','company ka latest kya hai'
+];
+
+const CONTENT_KW = [
+  'controversial','controversy','political','politics','sensitive','adult','violence',
+  'violent','illegal','banned','restricted','not allowed','cant do','cannot do',
+  'wont do','we dont do','what dont you do','what you dont cover','excluded',
+  'exclusion','limitations','restriction','restrictions','not accepted','not acceptable',
+  'unacceptable','inappropriate','what is not allowed','what is banned',
+  'what is restricted','kya nahi karte','kya nahi karte ho','kya nahi hoga',
+  'kya allowed nahi','kya restricted hai','kya banned hai','kya controversial hai',
+  'rajneeti','rajniti','political cheezein','sensitive content','adult content',
+  'violence content','illegal content','restricted content',
+  'what content you avoid','content restrictions','content policy','content guidelines',
+  'content rules','what topics you avoid','restricted topics','restricted subjects',
+  'press controversy','controversial press','political press','political release',
+  'political content','kya nahi kr skte','kya possible nahi','kya nahi accept karte',
+  'kya reject karte ho','kya reject hoga','rejection criteria','what gets rejected',
+  'what is rejected','what do you reject','defamatory','profane','sexually explicit',
+  'open letter','personal opinion','editorial guidelines','what we dont publish',
+  'what you wont publish','not distribute','nahi distribute karte',
+  'kya open letter chal sakta','kya personal opinion chal sakta',
+  'kya hate speech chal sakti','kya abusive content chal sakta',
+  'do you reject','will you reject my release','kya mera release reject hoga',
+  'release reject kab hoti hai','editorial rejection','rejection policy',
+  'what is not publishable','what cannot be published','what will be rejected',
+  'what releases do you not do','what releases dont you do',
+  'what releases wont you do','releases you avoid','releases you reject',
+  'avoid type of releases','type of releases you reject'
+];
+
+const CONTACT_KW = [
+  'contact','contacts','reach','reach out','get in touch','connect','call','callback',
+  'call back','call me','call karo','call karo mujhe','mobile','mobile number',
+  'whatsapp number','office','office address','office number','helpline',
+  'support number','customer care','customer support','contact number',
+  'contact detail','contact info','how to contact','how to reach','how to connect',
+  'mujhe call karo','mujhe contact karo','mujhe reach karo','contact karo',
+  'reach karo','baat karo','baat karni hai','baat karni h','baat karna chahta',
+  'baat karna chahti','milna chahta','milna chahti','meeting chahiye',
+  'meeting kab hogi','appointment','appointment chahiye','schedule',
+  'schedule meeting','book meeting','baat ho sakti hai','kab baat ho sakti',
+  'kab milenge','kab connect hoga','contact information','contact details',
+  'where can i reach','give me your number','share your number','share contact',
+  'tumhara number','anku ka number','helpline number','support contact',
+  'connect karo','reach karo mujhe','mujhe connect karo',
+  'speak to someone','speak to a person','human agent','talk to a person',
+  'talk to someone','real person','kisi se baat karni','team se baat',
+  'talk to team','speak to team','want to talk','want to connect',
+  'baat karni thi','connect karna tha','milna tha','discuss karna hai',
+  'discuss karna tha','ek baar baat karte hain','call schedule karo',
+  'meeting schedule karo','quick call','quick chat','quick discussion',
+  'phone pe baat','whatsapp pe baat','zoom call','video call'
+];
+
+const MEDIA_KW = [
+  'pr','media','press','journalist','reporter','news agency','news channel','tv',
+  'television','radio','magazine','newspaper','publication','editorial','editor',
+  'media house','media company','media query','media enquiry','media inquiry',
+  'publicity','publicist','public relations','public relation','branding',
+  'brand story','brand news','coverage','media coverage','press coverage',
+  'news coverage','feature','featured','feature story','interview',
+  'media interview','press interview','spokesperson','media contact','press contact',
+  'pr contact','pr query','pr inquiry','pr enquiry','pr team','media team',
+  'press team','media kit','press kit','media release','news release',
+  'journalist contact','reporter contact','news story','story pitch','pitch',
+  'story idea','media partner','press partner','coverage request',
+  'feature request','interview request','wire service','news wire',
+  'distribution service','press distribution','media distribution',
+  'media outreach','press outreach','media relations','press relations',
+  'media strategy','pr strategy','media campaign','pr campaign',
+  'brand visibility','brand awareness','brand coverage','media visibility'
+];
+
+const THANKS_KW = [
+  'thank','thanks','thank you','thankyou','thnk','thnks','thnku','thx','ty','thanx',
+  'shukriya','dhanyavaad','dhanyawad','meherbani','bahut shukriya',
+  'thank you so much','thanks a lot','many thanks','thank you very much',
+  'appreciate','appreciated','i appreciate','much appreciated','grateful',
+  'very helpful','so helpful','really helpful','that helped','helped me',
+  'you helped','good help','nice help','that was helpful','that was useful',
+  'you are great','you are amazing','great job','nice job','well done','good job',
+  'amazing','awesome','wonderful','fantastic','excellent','perfect','superb',
+  'brilliant','outstanding','wah','bahut acha','bahut badhiya','sahi hai',
+  'bilkul sahi','mast hai','ekdum mast','solid','good answer','nice answer',
+  'perfect answer','clear hai','samajh gaya','samajh gayi','got it','understood',
+  'clear','acha','theek hai','theek h','ok thanks','okay thanks','alright thanks',
+  'all good','all clear','that works','that helps','noted','noted thanks',
+  'bahut helpful tha','bahut helpful raha','helpful tha','helpful raha',
+  'kafi helpful tha','accha laga','mast laga','acha laga','this was useful',
+  'this helped','much obliged','obliged','you rock','you are the best',
+  'this is great','this is helpful','this is useful','love it','great response',
+  'great answer','perfect response','exactly what i needed','exactly right',
+  'bilkul theek','bilkul sahi jawab','sahi jawab'
+];
+
+const GOODBYE_KW = [
+  'bye','goodbye','good bye','see you','see ya','cya','later','talk later',
+  'ttyl','catch you later','take care','ok bye','okay bye','chalo bye','chal bye',
+  'baad mein','phir milenge','phir baat karte','phir aaunga','phir aaungi',
+  'alvida','khuda hafiz','allah hafiz','rab rakha','thanks bye','thank you bye',
+  'ok thanks bye','all done','that is all','thats all','nothing else','kuch nahi',
+  'bas','bas itna hi','itna kaafi hai','kaafi hai','sab ho gaya','ho gaya',
+  'sab clear','done for now','that is everything','no more questions',
+  'no further questions','aur kuch nahi','aur nahi chahiye','sab mil gaya',
+  'khatam','finish','finished','complete','completed','all set','all good now',
+  'take care now','have a good day','have a nice day','have a great day',
+  'have a wonderful day','good night','good evening','good morning bye',
+  'will talk later','will connect later','will be in touch','will reach out',
+  'baad mein baat karte hain','abhi ke liye itna hi','abhi ke liye bas'
+];
+
+const ABOUT_KW = [
+  'what do you do','what you do','what does newsvoir do','what is newsvoir',
+  'who are you','what are you','tell me about yourself','tell me about newsvoir',
+  'about you','about newsvoir','about this','about the company','about your company',
+  'what is this','what can you do','what can you help','how can you help',
+  'what services','what do you offer','what do you provide','your services',
+  'your offerings','services kya hain','services kya h','kya karte ho',
+  'kya karte hain','kya provide karte ho','kya offer karte ho','aap kya karte ho',
+  'company kya karti hai','company kya karti h','company ke baare mein',
+  'company ke bare mein','company batao','khud ke baare mein batao',
+  'apne baare mein batao','kya kaam karte ho','kaam kya hai','work kya hai',
+  'kya deal karte ho','kis field mein ho','what field','what industry',
+  'what is your work','what is your main work','your main work',
+  'main work kya hai','your work kya hai','aapka kaam','aapka kaam kya hai',
+  'kaam kya h','kaam batao','what work do you do','what kind of work',
+  'what type of work','newsvoir kya hai','newsvoir kya karta hai',
+  'newsvoir ke baare mein','what is your business','your business','your company',
+  'company ka kaam','what do you specialize in','specialization','expertise',
+  'kya expertise hai','press release banate ho','pr services','pr service kya hai',
+  'public relations services','explain yourself','introduce yourself',
+  'apna parichay','parichay','introduction','kya krte ho','kya krte hain',
+  'kya hota hai yahan','yahan kya hota hai','is site ka kaam','site kya karti hai',
+  'bot kya karta hai','anku kya karta hai','newsvoir chatbot kya hai',
+  'press release service','press release platform','press release distribution',
+  'wire service kya hai','distribution platform','media platform','pr platform',
+  'newsvoir kya kaam karta hai','newsvoir ka kaam kya hai','newsvoir service kya hai',
+  'newsvoir kya provide karta hai','newsvoir mein kya milta hai',
+  'newsvoir kya hai exactly','briefly explain newsvoir','explain newsvoir',
+  'summarize newsvoir','give me an overview','overview of newsvoir',
+  'tell me everything about newsvoir','newsvoir overview','newsvoir summary'
+];
+
+const CAPABILITIES_KW = [
+  'can you help','kya aap help','kya tum help','aap kar sakte ho',
+  'tum kar sakte ho','is it possible','possible hai','ho sakta hai',
+  'kya possible hai','help kar sakte ho','help karoge','madad karoge',
+  'assist karoge','kya support milega','support doge','kya aap bata sakte',
+  'kya tum bata sakte','kya batao ge','what can you do for me',
+  'what are you capable of','tumse kya ho sakta','kya kar sakte ho',
+  'kitna kaam kar sakte ho','can you guide me','can you assist me',
+  'are you able to help','are you able to assist','kya tum guide karoge',
+  'kya tum assist karoge','kya tum madad karoge'
+];
+
+const HOW_IT_WORKS_KW = [
+  'how does it work','how it works','how does newsvoir work','how does this work',
+  'how to use','how to start','how to begin','how to register','how to submit',
+  'how to send press release','how to send','how to send a press release',
+  'process kya hai','kaise kaam karta hai','kaise use krun','kaise shuru krun',
+  'step by step','steps kya hain','procedure kya hai','kya karna hoga',
+  'kya karna padega','kya process hai','joining process','onboarding',
+  'kaise join karein','sign up kaise karein','how do i start','where do i start',
+  'what is the process','what are the steps','explain the process',
+  'bata do kaise kaam karta','samjhao kaise kaam karta','kaise chalega',
+  'newsdesk@newsvoir.com','client membership agreement','membership form',
+  'registration form','how to register with newsvoir','first time client',
+  'new client process','getting started','get started','start using newsvoir',
+  'begin using newsvoir','how to use newsvoir','newsvoir mein kaise register',
+  'pehli baar kaise','pehli baar use','pehli baar submit','first submission',
+  'client agreement','membership agreement','register kaise karein',
+  'account kaise banayein','newsvoir account','newsvoir registration',
+  'sign up newsvoir','join newsvoir','start with newsvoir','begin with newsvoir',
+  'how does the service work','service kaise kaam karti hai',
+  'press release distribute kaise hoti hai','press release kaise jaati hai',
+  'press release kaise bhejein','press release submit kaise karein',
+  'kaha bhejein press release','newsdesk','instructions kaise bhejein',
+  'distribution instructions','kya instructions dene hote hain'
+];
+
+const PROCESSING_TIME_KW = [
+  'how much time','how long','time kitna','kitna time','kitna waqt',
+  'processing time','publication time','publish hone mein kitna time',
+  'kitne time mein publish hoga','when will it publish','kab publish hoga',
+  'kab tak hoga','deadline','turnaround','turnaround time','same day',
+  'how fast','kitna fast','jaldi hoga','urgent','urgently','asap','express',
+  'time lega kitna','time lagega','time lagta hai kitna','how quickly',
+  'quickly publish','fast publish','how soon','kitni jaldi',
+  'press release kab aayegi','kab distribute hoga','publication deadline',
+  'submission deadline','how many hours','kitne ghante','working hours',
+  'regular hours','office hours mein','60 minutes','30 minutes','40 minutes',
+  'how long does it take','how long will it take','when will my release go live',
+  'when will my press release be published','how fast do you publish',
+  'same day publishing','express publishing','urgent press release',
+  'kitne din mein','kitne dino mein','1 ghante mein','ek ghante mein',
+  'half hour mein','aadhe ghante mein','within an hour',
+  'press release processing','release processing time','distribution time',
+  'how long after submission','submission ke kitne time baad','publish kab hogi'
+];
+
+const WRITING_SERVICE_KW = [
+  'writing service','press release writing','write my press release','likh do',
+  'likh denge','writing team','editing','editors','draft','drafting',
+  'ghostwrite','ghostwriting','content writing','writing help',
+  'kya aap likhte ho','kya aap likhenge','likhne mein help',
+  'help with writing','write for me','write it for me','press release draft',
+  'draft karo','content banao','content bana do','seo writing',
+  'keyword research','proofreading','editing service','kya editing milegi',
+  'editing milegi kya','content team','writing team hai kya',
+  'kya aap content banate ho','content banana hai','release likhni hai',
+  'release likhna hai','press release banana hai','release draft chahiye',
+  'draft chahiye','likhwa denge','likhwa do','koi likhega mera',
+  'do you write press releases','do you offer writing service',
+  'can you write my press release','can you draft my press release',
+  'can you help me write','can you help with writing','writing assistance',
+  'content assistance','release writing assistance','pr writing',
+  'pr content','press release content','release content',
+  'kya aap meri press release likh sakte ho','kya writing team hai',
+  'kya editing team hai','meri press release check karo',
+  'meri press release edit karo','press release improve karo',
+  'headline suggest karo','better headline kaise likhu',
+  'headline likhne mein help','writing guidance','writing tips',
+  'press release writing tips','how to write better press release',
+  'improve my press release','make my press release better',
+  'kya aap review karenge','review my press release'
+];
+
+const WHAT_PUBLISH_KW = [
+  'what kind','what type','kya publish karte ho','kya distribute karte ho',
+  'kya disseminate karte ho','what do you publish','what do you distribute',
+  'what topics','which topics','corporate messaging','product launch',
+  'financial results','management changes','new hires','mergers','acquisitions',
+  'partnerships','market expansion','new offices','industry leaders',
+  'policy announcements','what content','what announcements',
+  'kya announce kar sakte','kya topic chal sakta','allowed topics',
+  'accepted topics','kya accept karte ho','kya categories hain',
+  'categories kya hain','types of press release','press release types',
+  'kya corporate news chal sakti','kya financial result chal sakta',
+  'kya product launch chal sakta','kya partnership announcement chal sakti',
+  'kya new hire announcement chal sakti','kya merger news chal sakti',
+  'kya acquisition news chal sakti','kya opening announcement chal sakti',
+  'kya industry news chal sakti','eligible content','eligible topics',
+  'what is eligible','kya eligible hai','press release categories',
+  'announcement categories','news categories',
+  'what kind of press releases do you publish','what type of press releases',
+  'what type of content do you accept','what type of announcements',
+  'can i send a product launch press release','can i send financial news',
+  'can i send merger news','can i send hr announcement','can i send ceo quote',
+  'is my content eligible','will my press release be accepted',
+  'kya meri press release chalegi','kya mera content accepted hoga',
+  'kya mera announcement publish hoga','mera content chal sakta hai kya',
+  'corporate press release','business press release','startup press release',
+  'ngo press release','nonprofit press release','government press release',
+  'do you publish for startups','do you publish for corporates',
+  'kya startup ka bhi publish hoga','kya chhoti company ka bhi chalega'
+];
+
+const SEO_KW = [
+  'seo','search engine','seo friendly','seo optimize','search engine optimized',
+  'meta description','h1 tags','url rewriting','google ranking','bing','yahoo',
+  'online visibility','search visibility','seo kaise karte ho','seo milega kya',
+  'seo hoga kya','optimize karte ho kya','search mein aayega kya',
+  'google mein aayega kya','online visibility kaise','digital presence',
+  'online presence','seo practices','seo techniques','seo benefits',
+  'seo kya hoga','kya seo milega','press release seo','seo optimized release',
+  'will google find it','will it rank','search engine friendly',
+  'kya google pe aayega','kya online dikhega','digital footprint',
+  'online reach','search reach','ranking','google ranking','bing ranking',
+  'will my press release rank','will my press release appear on google',
+  'will my release be searchable','can people find my release online',
+  'online findability','discoverability','search discoverability',
+  'kya mera press release google pe aayega','kya searchable hoga',
+  'kya online dikhega','kya log dhundh sakte hain','kya easily milega',
+  'search engine optimization','digital optimization','content optimization',
+  'release optimization','press release optimization','seo for press release',
+  'seo benefits of press release','seo advantage','seo value',
+  'backlinks','anchor text','keyword optimization','search keywords',
+  'targeted keywords','industry keywords','brand keywords','seo keywords',
+  'kya backlinks milenge','kya anchor links honge','kya keywords use hote hain'
+];
+
+const PREPARE_KW = [
+  'how to prepare','prepare press release','press release tips',
+  'good press release','press release guidelines','headline','boilerplate',
+  'about us paragraph','media contact','anchor links','multimedia',
+  'images videos','quote ceo','ticker symbol','isin','reuters bloomberg',
+  'press release format','format kya hona chahiye','format batao',
+  'tips batao','guidelines batao','kya include karein','kya daalna chahiye',
+  'press release mein kya ho','press release structure',
+  'structure kya honi chahiye','impactful headline','seo headline',
+  'newsworthy','target audience','journalist attention',
+  'press release template','release format','release structure',
+  'kaise likhu press release','press release kaise likhu',
+  'press release banana sikhao','press release sikhao',
+  'good headline kaise likhu','effective press release kaise banayein',
+  'press release elements','press release components','what to include',
+  'what to add in press release','press release content',
+  'how long should a press release be','press release length',
+  'kitni lambi press release honi chahiye',
+  'how to write a press release','writing a press release',
+  'press release writing guide','press release best practices',
+  'effective press release','impactful press release','powerful press release',
+  'press release dos and donts','what to avoid in press release',
+  'common press release mistakes','press release mistakes',
+  'press release checklist','release checklist','what makes a good press release',
+  'what makes an effective press release','press release structure guide',
+  'ideal press release format','perfect press release','standard press release',
+  'standard format','industry standard','journalistic style','inverted pyramid',
+  'boilerplate kya hota hai','boilerplate kaise likhein','about us kaise likhein',
+  'company description kaise likhein','spokesperson quote kaise likhein',
+  'ceo quote kaise likhein','quote kaise likhein','media contact kaise likhein',
+  'press release headline tips','headline kaise likhu','catchy headline',
+  'seo headline kaise likhein','headline guidelines','headline best practices',
+  'word limit press release','image guidelines press release',
+  'video guidelines press release','multimedia guidelines',
+  'logo requirements','company logo press release',
+  'what format to send press release in','word format','pdf format',
+  'kaunsa format mein bhejein','word mein bhejein ya pdf mein'
+];
+
+const MEDIA_MONITORING_KW = [
+  'media monitoring','monitoring service','track media','print media',
+  'online media','media tracking','coverage tracking','kab aayega monitoring',
+  'monitoring kab hoga','monitoring service kab','when will monitoring launch',
+  'monitoring launch','press release tracking','release tracking',
+  'track my press release','monitor my release','coverage report',
+  'media report','press report','mera coverage kahan hai',
+  'mera press release kahan gaya','kahan publish hua','where was it published',
+  'tracking karte ho kya','monitoring karte ho kya','analytics milenge kya',
+  'kya tracking milegi','kya report milegi','kya analytics milega',
+  'media coverage report','press coverage report','distribution report',
+  'where did my press release go','which outlets published my release',
+  'kaunse outlets ne publish kiya','media list kya hai','kitne outlets hain',
+  'how many outlets','distribution network','newsvoir network','media network',
+  'press release reach','release reach','distribution reach',
+  'kahan kahan publish hua','kaun kaun se media mein gaya',
+  'online coverage','print coverage','digital coverage','tv coverage',
+  'radio coverage','website coverage','portal coverage',
+  'performance report','release performance','press release performance',
+  'kya performance report milegi','kya coverage report milegi',
+  'kya metrics milenge','kya data milega','analytics kya hoga',
+  'kya main dekh sakta hun kahan publish hua','visibility report'
+];
+
+const CONTACT_EMAIL_KW = [
+  'info@newsvoir.com','newsdesk@newsvoir.com','digital@newsvoir.com',
+  'email karo','mail karo','contact email','email address kya hai',
+  'email id kya hai','kaise contact karein','get in touch','reach out to you',
+  'contact karna hai','email bhejein kahan','kahan mail karein',
+  'email address batao','mail id batao','contact id batao',
+  'newsvoir email','newsvoir ka email','newsvoir mail','newsvoir contact',
+  'team ka email','team email','submit email','bhejne ka email',
+  'press release bhejein kahan','kahan submit karein','submission email',
+  'what is your email','what is your email address','what is the contact email',
+  'where do i email','where do i send','where can i write',
+  'how do i reach you by email','email pe kaise contact karein',
+  'mail pe kaise contact karein','email mein kya bhejein',
+  'registration email kahan bhejein','membership form kahan bhejein',
+  'client agreement kahan bhejein','press release kahan bhejein',
+  'kahan bhejun press release','kahan bhejun agreement',
+  'newsvoir ka contact number','newsvoir number','newsvoir phone',
+  'kya phone number hai','phone number batao','call karein kaise',
+  'kya call kar sakte hain','number pe contact karein'
+];
+
+const WHO_USES_KW = [
+  'who uses newsvoir','who can use newsvoir','who is newsvoir for','who are your clients',
+  'kaun use karta hai','kaun use kar sakta hai','mere liye hai kya','meri company ke liye',
+  'business owner','entrepreneur','startup','corporate','pr professional','pr firm',
+  'marketing professional','digital agency','seo agency','investor relations',
+  'social media agency','marketing agency','pr agency','who is your target',
+  'target audience','target clients','client base','kaunsi companies','kaunsi industry',
+  'konsi company ke liye','kis ke liye hai','sme','small business','large business',
+  'medium business','listed company','unlisted company','ngo','nonprofit',
+  'government','government company','public sector','private sector'
+];
+
+const BENEFITS_KW = [
+  'why newsvoir','why use newsvoir','benefits','advantages','value','what value',
+  'what do i get','what will i get','kya milega','kya fayde hain','kya benefit hai',
+  'kyun use karein','kyun aapko choose karein','why choose you','why should i use',
+  'what makes you different','what makes newsvoir different','unique','special',
+  'better than','newsvoir vs','comparison','compare','credibility','brand credibility',
+  'brand awareness','brand visibility','online presence','digital presence',
+  'why newsvoir is best','newsvoir advantages','newsvoir benefits','value proposition',
+  'roi','return on investment','worth it','kya worth hai','paisa wasool','cost effective',
+  'affordable','value for money','best price','cheap','economical','pay per use',
+  'no retainer','no lock in','no upfront','flexible pricing','simple pricing'
+];
+
+const REACH_KW = [
+  'reach','media reach','journalist reach','how many journalists','kitne journalists',
+  'kitni reach hai','kitna reach milega','5000','5000 journalists','media network',
+  'blogger','bloggers','social media','social sharing','national reach','regional reach',
+  'local reach','india reach','pan india','all india','google','yahoo','bing',
+  'search engine','rss feed','social network','twitter','facebook','linkedin',
+  'instagram','news outlet','news website','news portal','online portal',
+  'how many media points','kitne media points','coverage kitna hoga','kitni jagah',
+  'kitne outlets','distribution network','media list','journalist list',
+  'kitne log dekhenge','audience reach','eyeballs','visibility','online visibility',
+  'first press release coverage','50 coverages','50+ coverages','maximum coverage',
+  'wide reach','broad reach','nationwide','countrywide'
+];
+
+const TRACKING_KW = [
+  'track','tracking','report','reporting','coverage report','where published',
+  'kahan publish hua','kahan gaya','coverage links','url links','media points covered',
+  'which outlets','konse outlets','periodic updates','updates milenge','kab update milega',
+  'transparency','full transparency','newsvoir tracking','team tracking','auto track',
+  'manual tracking','online tracking','print tracking','kya track hoga','kya report milegi',
+  'visibility report','coverage visibility','media report','press report',
+  'how do i know where it was published','how will i know','mujhe kaise pata chalega',
+  'coverage update','when will i get report','report kab milega','link milega kya',
+  'coverage links milenge','url milenge'
+];
+
+const MULTIMEDIA_KW = [
+  'image','images','photo','photos','photograph','photographs','video','videos',
+  'audio','multimedia','picture','pictures','logo','company logo','brand logo',
+  'infographic','graphic','visual','visuals','media file','attachment',
+  'kya image laga sakte','kya photo laga sakte','kya video laga sakte',
+  'image ke saath','photo ke saath','video ke saath','multimedia release',
+  'rich media','media rich','image search','video website','youtube',
+  'can i add image','can i add video','can i add photo','image allowed',
+  'video allowed','photo allowed','multimedia allowed','kya multimedia chal sakta',
+  'image kaise lagaein','video kaise lagaein','photo kaise lagaein',
+  'image size','video size','image format','video format','jpg','jpeg','png','mp4'
+];
+
+const DISTRIBUTION_KW = [
+  'how do you distribute','distribution process','how is it distributed',
+  'kaise distribute karte ho','distribution kaise hoti hai','kaise jaata hai',
+  'kaise pahunchta hai','instant delivery','real time','immediately','turant',
+  'jaise hi publish hoga','publish hote hi','rss feed','platform','sharing platform',
+  'social sharing','how do you send','send kaise karte ho','distribute kaise karte ho',
+  'disseminate kaise karte ho','publish kaise karte ho','kaise live hoga',
+  'distribution method','distribution channel','how news spreads','news kaise phailta hai'
+];
+
+const TESTIMONIAL_KW = [
+  'testimonial','review','feedback','client feedback','customer review','success story',
+  'case study','who has used','koi example','koi case','client example',
+  'kya kisi ne use kiya','previous clients','past clients','happy clients',
+  'satisfied clients','client testimonial','client review','what clients say',
+  'ratings','rating','star rating','how good','how reliable','trustworthy',
+  'chintan mehta','gaurav gupta','alok sardana','80db communications','bookbhook',
+  'icix','kiran ray chaudhury','what do customers say','is newsvoir good',
+  'newsvoir reviews','newsvoir rating','newsvoir feedback'
+];
+
+const SOCIAL_KW = [
+  'social media','social','twitter','facebook','linkedin','instagram','social sharing',
+  'social network','viral','virality','engagement','social engagement','social reach',
+  'social visibility','hashtag','trending','social influencer','influencer',
+  'kya social media pe jaata hai','kya facebook pe jaata hai','kya twitter pe jaata hai',
+  'kya linkedin pe jaata hai','social pe share hoga kya','social reach milega kya',
+  'social media distribution','social press release','digital distribution',
+  'online distribution','web distribution','internet distribution'
+];
+
+const NAME_PATTERNS = [
+  /^(?:my\s+(?:full\s+)?name\s+(?:is\s+)?)/i,
+  /^(?:i\s+am\s+|i'm\s+|myself\s+|this\s+is\s+|call\s+me\s+|it'?s\s+)/i,
+  /^(?:mera\s+naam\s+(?:hai\s+|h\s+)?|main\s+(?:hoon|hun|hu)\s+|mujhe\s+(?:kehte|bolte|bulate)\s+(?:hain|hein|h)\s+)/i,
+  /^(?:hi|hello|hey|hii+|hiya|heya),?\s+(?:i\s+am\s+|i'm\s+|myself\s+|my\s+name\s+(?:is\s+)?|mera\s+naam\s+)?/i,
+  /^(?:name|naam|mera\s+naam)\s*[:\-]?\s*/i,
+  /^(?:people\s+call\s+me\s+|you\s+can\s+call\s+me\s+|friends\s+call\s+me\s+)/i,
+];
+
+let step = 0, userName = '', chatOpen = false, busy = false, chosenTopic = '', emailCollected = '', phoneCollected = '', awaitingEmail = false, awaitingPhone = false;
+
+const chatBody = document.getElementById('chat-body');
+const txtIn = document.getElementById('txt-in');
+
+function scrollBottom() { chatBody.scrollTop = chatBody.scrollHeight; }
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chat-window').classList.toggle('hidden', !chatOpen);
+  document.getElementById('notif-dot').classList.add('hidden');
+  document.getElementById('icon-open').classList.toggle('hidden', chatOpen);
+  document.getElementById('icon-close').classList.toggle('hidden', !chatOpen);
+  if (chatOpen && step === 0) initChat();
+}
+
+function initChat() {
+  step = 1;
+  setTimeout(() => addMsg('bot', 'Hi there! I am Newsvoir.'), 400);
+  setTimeout(() => addMsg('bot', 'May I know your name?'), 1100);
+}
+
+function addMsg(type, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + type;
+  d.textContent = text;
+  chatBody.appendChild(d);
+  scrollBottom();
+  return d;
+}
+
+function showTyping(cb, delay) {
+  delay = delay || 900;
+  const t = document.createElement('div');
+  t.className = 'typing-wrap';
+  t.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+  chatBody.appendChild(t);
+  scrollBottom();
+  setTimeout(function() { t.remove(); cb(); scrollBottom(); }, delay);
+}
+
+function extractName(val) {
+  let cleaned = val.trim();
+  for (var i = 0; i < NAME_PATTERNS.length; i++) {
+    const result = cleaned.replace(NAME_PATTERNS[i], '').trim();
+    if (result && result !== cleaned) { cleaned = result; break; }
+  }
+  cleaned = cleaned.replace(/[.!?,;]+$/, '').replace(/\s+(?:hai|h|hoon|hun|hu|hain|hein)$/i, '').trim();
+  // Remove common noise/typo words that appear before real names
+  cleaned = cleaned.replace(/^(?:js|is|am|are|the|a|an|mr|mrs|ms|dr|sir|ma'am|mam|dear|hi|hello|hey)\s+/i, '').trim();
+  if (!cleaned || cleaned.split(/\s+/).length > 4) return val.trim();
+  return cleaned.split(/\s+/).map(function(w) {
+    return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+  }).join(' ');
+}
+
+function isValidEmail(str) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str.trim()); }
+
+function extractEmail(str) {
+  const m = str.match(/[^\s@]+@[^\s@]+\.[^\s@]+/);
+  return m ? m[0] : null;
+}
+
+function extractPhone(str) {
+  const m = str.replace(/[\s\-().+]/g, '').match(/\d{10,13}/);
+  return m ? m[0] : null;
+}
+
+function matchesAny(lower, list) {
+  for (var i = 0; i < list.length; i++) {
+    var item = list[i];
+    if (item instanceof RegExp) { if (item.test(lower)) return true; }
+    else { if (lower.indexOf(item) !== -1) return true; }
+  }
+  return false;
+}
+
+function hasNegation(lower) {
+  return /\b(don't|dont|not|avoid|never|no|won\'t|wont|can\'t|cant|refuse|reject|excluded|restriction|restricted|banned|illegal|nahi|nahi karte|mat|band)\b/.test(lower);
+}
+function detectIntent(lower) {
+  const neg = hasNegation(lower);
+  if (matchesAny(lower, WHO_USES_KW)) return 'who_uses';
+  if (matchesAny(lower, BENEFITS_KW)) return 'benefits';
+  if (matchesAny(lower, REACH_KW)) return 'reach';
+  if (matchesAny(lower, TRACKING_KW)) return 'tracking';
+  if (matchesAny(lower, MULTIMEDIA_KW)) return 'multimedia';
+  if (matchesAny(lower, DISTRIBUTION_KW)) return 'distribution';
+  if (matchesAny(lower, TESTIMONIAL_KW)) return 'testimonial';
+  if (matchesAny(lower, SOCIAL_KW)) return 'social';
+  if (matchesAny(lower, HOW_IT_WORKS_KW)) return 'how_it_works';
+  if (matchesAny(lower, PROCESSING_TIME_KW)) return 'processing_time';
+  if (matchesAny(lower, WRITING_SERVICE_KW)) return 'writing_service';
+  if (matchesAny(lower, WHAT_PUBLISH_KW)) return 'what_publish';
+  if (matchesAny(lower, SEO_KW)) return 'seo';
+  if (matchesAny(lower, PREPARE_KW)) return 'prepare';
+  if (matchesAny(lower, MEDIA_MONITORING_KW)) return 'media_monitoring';
+  if (matchesAny(lower, CONTACT_EMAIL_KW)) return 'contact_email';
+  if (!neg && matchesAny(lower, ABOUT_KW)) return 'about';
+  if (!neg && matchesAny(lower, CAPABILITIES_KW)) return 'capabilities';
+  if (matchesAny(lower, CONTENT_KW)) return 'content';
+  if (matchesAny(lower, PRICING_KW)) return 'pricing';
+  if (matchesAny(lower, RELEASES_KW)) return 'releases';
+  if (matchesAny(lower, CONTACT_KW)) return 'contact';
+  if (matchesAny(lower, MEDIA_KW)) return 'media';
+  if (matchesAny(lower, THANKS_KW)) return 'thanks';
+  if (matchesAny(lower, GOODBYE_KW)) return 'goodbye';
+  return 'unknown';
+}
+
+
+function handleWhoUses() {
+  showTyping(function() {
+    addMsg('bot', 'Newsvoir serves a wide range of clients across India!');
+    setTimeout(function() {
+      addMsg('bot', 'Business Owners & Startups use us to maximize visibility at minimal cost. Corporates use us for product launches, financial disclosures, and brand messaging. PR Professionals & Agencies use our platform to deliver results for their clients. Marketing & Digital Agencies use us to boost virality and engagement. Investor Relations professionals use us to manage brand presence credibly.');
+      setTimeout(function() {
+        addMsg('bot', 'No matter your size or industry — if you have a story to tell, Newsvoir is the right platform. Would you like to know more about our pricing or how to get started?');
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleBenefits() {
+  showTyping(function() {
+    addMsg('bot', 'Here is the value Newsvoir brings to you:');
+    setTimeout(function() {
+      addMsg('bot', 'Instant delivery to 5000+ journalists and bloggers. National and regional reach across India. Full SEO optimization for Google, Yahoo, and Bing. Social media shareability. Multimedia support — images, videos, and audio. Pay-per-use model with no lock-in fees or retainers. Editorial guidance and support from our team. Full transparency with coverage reports and URL links. And most importantly — credibility through news, not ads!');
+      setTimeout(function() {
+        addMsg('bot', 'Want to know about pricing or how to get started? I am happy to help!');
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleReach() {
+  showTyping(function() {
+    addMsg('bot', 'Newsvoir has one of the largest media networks in India!');
+    setTimeout(function() {
+      addMsg('bot', 'Your press release reaches 5000+ journalists, bloggers, trade experts, and social media influencers. It gets distributed to major search engines like Google, Yahoo, and Bing. It also appears across RSS feeds, social networks, and our highly visited website — which is regularly browsed by journalists, media personnel, and marketing professionals daily.');
+      setTimeout(function() {
+        addMsg('bot', 'With your very first press release, you could receive 50+ media coverages! Would you like to know how to get started?');
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleTracking() {
+  showTyping(function() {
+    addMsg('bot', 'Newsvoir takes care of all tracking for you — no effort required on your part!');
+    setTimeout(function() {
+      addMsg('bot', 'From the moment your press release is published, our team starts tracking your online presence. You will receive periodic updates with links to every URL where your news has been covered. All coverages are clearly identified and shared with you — and also featured on our website and Facebook page for maximum visibility.');
+      setTimeout(function() {
+        addMsg('bot', 'Full transparency. Complete reporting. Zero effort from your side. Want to know more about getting started?');
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleMultimedia() {
+  showTyping(function() {
+    addMsg('bot', 'Absolutely — Newsvoir fully supports multimedia in your press releases!');
+    setTimeout(function() {
+      addMsg('bot', 'You can include photographs, videos, audio clips, infographics, and your company logo. Multimedia makes your release more engaging, improves visibility on image and video search platforms, and significantly boosts your brand identity. Our team will help you integrate all media seamlessly.');
+      setTimeout(function() {
+        addMsg('bot', 'Need help with a multimedia release? Feel free to share your email and our team will guide you!');
+        awaitingEmail = true;
+        chosenTopic = 'Multimedia Release Enquiry';
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleDistribution() {
+  showTyping(function() {
+    addMsg('bot', 'Our distribution process is simple and instant!');
+    setTimeout(function() {
+      addMsg('bot', 'You send your press release to newsdesk@newsvoir.com with your instructions and preferred distribution time. The moment it is published, our platform pushes it simultaneously to thousands of media points — journalists, bloggers, RSS feeds, social networks, and search engines — in real time.');
+      setTimeout(function() {
+        addMsg('bot', 'It is effortless — all you do is send us the release, and we handle everything from there!');
+        busy = false;
+      }, 500);
+    }, 500);
+  });
+}
+
+function handleTestimonial() {
+  showTyping(function() {
+    addMsg('bot', 'Our clients love what Newsvoir does for them! Here are a few words from them:');
+    setTimeout(function() {
+      addMsg('bot', 'We have had an extremely satisfying experience. Their help, guidance and services have been phenomenal." — Ms. Chintan Mehta, MD, ICIx Pvt. Ltd.');
+      setTimeout(function() {
+                  addMsg('bot', 'NewsVoir coverage output, swift response and relationship management is what makes them stand out — Kiran Ray Chaudhury, Co-founder, 80 dB Communications. Would you like to experience Newsvoir yourself?');
+        setTimeout(function() {
+                    addMsg('bot', 'NewsVoir coverage output, swift response and relationship management is what makes them stand out — Kiran Ray Chaudhury, Co-founder, 80 dB Communications. Would you like to experience Newsvoir yourself?');
+          busy = false;
+        }, 600);
+      }, 500);
+    }, 500);
+  });
+}
+
+function handleSocial() {
+  showTyping(function() {
+    addMsg('bot', 'Yes! Social media distribution is a key part of what we do.');
+    setTimeout(function() {
+      addMsg('bot', 'Every press release is distributed across major social networks including Twitter, Facebook, and LinkedIn. We add social sharing features to help your news spread virally. You can also include your own social media links in the release. Influencers and industry experts on our network can further amplify your story!');
+      setTimeout(function() {
+        addMsg('bot', 'Virality and engagement are built right into our platform. Want to get started?');
+        busy = false;
+      }, 500);
+    }, 500);
+  });
+}
+
+function handleHowItWorks() {
+  showTyping(function() {
+    addMsg('bot', 'Getting started with Newsvoir is simple!');
+    setTimeout(function() {
+      addMsg('bot', '1. Register by filling the Client Membership Agreement (one-time only) and mail it to info@newsvoir.com. 2. Write your press release and send it to newsdesk@newsvoir.com with distribution instructions. 3. Our team processes and distributes it across media channels.');
+      setTimeout(function() {
+        addMsg('bot', 'Once registered, you also get updates on new services, products, and promotional offers. Would you like to know about our pricing or anything else?');
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleProcessingTime() {
+  showTyping(function() {
+    addMsg('bot', 'During regular working hours, it takes approximately 30 to 60 minutes to process a two A4 page press release with regular font size.');
+    setTimeout(function() {
+      addMsg('bot', 'If your release includes images or videos, add approximately 10 minutes per media file. These are indicative timelines — if there is higher volume on a given day, our team will proactively inform you. We believe in complete professionalism!');
+      busy = false;
+    }, 500);
+  });
+}
+
+function handleWritingService() {
+  showTyping(function() {
+    addMsg('bot', 'Absolutely! Our writing and editing team can draft a press release that best encapsulates your brand\'s message.');
+    setTimeout(function() {
+      addMsg('bot', 'This includes SEO practices, keyword research, precise writing, and thorough proofreading before publishing. Our editors also review every release for structural and grammatical improvements — and any suggested changes are shared with you via email for your approval before we go live.');
+      setTimeout(function() {
+        addMsg('bot', 'Would you like to connect with our team for more details? Please share your email and we will get in touch!');
+        awaitingEmail = true;
+        chosenTopic = 'Writing Service Enquiry';
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleWhatPublish() {
+  showTyping(function() {
+    addMsg('bot', 'Newsvoir disseminates a wide range of corporate announcements including product launches, financial results, management changes, new hires, mergers and acquisitions, partnerships, market expansion, new office openings, and industry leader reactions to budgets and policy announcements.');
+    setTimeout(function() {
+      addMsg('bot', 'We prefer not to distribute open letters, personal opinions, or any content that is defamatory, illegal, profane, or sexually explicit in nature. We retain the right to reject any press release that does not meet our editorial guidelines.');
+      busy = false;
+    }, 500);
+  });
+}
+
+function handleSEO() {
+  showTyping(function() {
+    addMsg('bot', 'At Newsvoir, we follow the latest SEO techniques to ensure maximum online and search engine visibility for your press release.');
+    setTimeout(function() {
+      addMsg('bot', 'This includes optimising titles, meta descriptions, H1 tags, URL rewriting, and image/video optimisation — all while maintaining compliance with Google, Bing, and Yahoo ethical SEO guidelines. Your release gets the best possible reach!');
+      busy = false;
+    }, 500);
+  });
+}
+
+function handlePrepare() {
+  showTyping(function() {
+    addMsg('bot', 'A great press release should be newsworthy and address your target audience — whether customers, investors, vendors, or other stakeholders.');
+    setTimeout(function() {
+      addMsg('bot', 'Key elements to include: an impactful SEO-friendly headline (around 65 characters), coverage of who, what, where, when, how and why, anchor links to your website, company logo, multimedia (images/videos under 2 minutes), a relevant quote from your CEO or senior executive, a strategic boilerplate (About Us), and media contact information.');
+      setTimeout(function() {
+        addMsg('bot', 'For listed companies, do include Reuters, Bloomberg ticker symbols or ISIN. Need help drafting? Our team is here to assist!');
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleMediaMonitoring() {
+  showTyping(function() {
+    addMsg('bot', 'Great news — Newsvoir will soon be launching an advanced media monitoring service for tracking both online and print media coverage!');
+    setTimeout(function() {
+      addMsg('bot', 'To be notified as soon as it launches, share your email and we will keep you updated.');
+      awaitingEmail = true;
+      chosenTopic = 'Media Monitoring Enquiry';
+      busy = false;
+    }, 500);
+  });
+}
+
+function handleContactEmail() {
+  showTyping(function() {
+    addMsg('bot', 'You can reach the Newsvoir team at the following email addresses:');
+    setTimeout(function() {
+      addMsg('bot', 'For press release submissions: newsdesk@newsvoir.com | For registration: info@newsvoir.com | For digital enquiries: digital@newsvoir.com');
+      busy = false;
+    }, 500);
+  });
+}
+
+function handleAbout() {
+  showTyping(function() {
+    addMsg('bot', 'Newsvoir is a professional press release and public relations service. We help businesses craft, distribute, and publish their press releases across the right media channels.');
+    setTimeout(function() {
+      addMsg('bot', 'We work with companies across industries to build their brand presence — through powerful press releases, media outreach, and strategic announcements. What we do not work with is any controversial, political, or sensitive content.');
+      setTimeout(function() {
+        addMsg('bot', 'Would you like to know about our pricing, our latest releases, or anything else? Feel free to ask!');
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function handleCapabilities() {
+  showTyping(function() {
+    addMsg('bot', 'Great question! Here is what I can help you with right now:');
+    setTimeout(function() {
+      addMsg('bot', '1. Pricing & plans — I can give you an overview and connect you with our team for a detailed quote.\n2. Our releases — I can share what we have recently worked on.\n3. Content policy — I can clarify what we do and do not work with.\n4. Media & PR enquiries — I can route your query to the right team.\n5. Connecting with us — I can take your details and have someone reach out.');
+      setTimeout(function() {
+        addMsg('bot', 'Just type what you need and I will take it from there!');
+        busy = false;
+      }, 600);
+    }, 500);
+  });
+}
+
+function askForEmail() {
+  if (emailCollected) {
+    setTimeout(function() {
+      addMsg('bot', 'We already have your email on file (' + emailCollected + '). Our team will reach out to you soon!');
+      busy = false;
+    }, 500);
+    return;
+  }
+  setTimeout(function() {
+    addMsg('bot', 'To connect you with the right person from our team, could you please share your email address?');
+    awaitingEmail = true;
+  }, 500);
+}
+
+function handlePricing() {
+  showTyping(function() {
+    addMsg('bot', 'At Newsvoir, our pricing is completely custom — we have multiple affordable plans designed for every size of business, from startups to large corporates.');
+    chosenTopic = 'Pricing Enquiry';
+    askForEmail();
+    busy = false;
+  });
+}
+
+function handleReleases() {
+  showTyping(function() {
+    addMsg('bot', 'Here is the details regarding the releases appears.');
+    chosenTopic = 'Releases Enquiry';
+    askForEmail();
+    busy = false;
+  });
+}
+
+function handleContent() {
+  showTyping(function() {
+    addMsg('bot', 'We do not work with press releases that involve any controversial or political content.');
+    chosenTopic = 'Content Policy Enquiry';
+    askForEmail();
+    busy = false;
+  });
+}
+
+function handleContact() {
+  showTyping(function() {
+    addMsg('bot', 'We would love to connect with you! Please share your email address and our team will reach out at the earliest.');
+    chosenTopic = 'Contact Request';
+    awaitingEmail = true;
+    busy = false;
+  });
+}
+
+function handleMedia() {
+  showTyping(function() {
+    addMsg('bot', 'Newsvoir is India\'s fastest and most reliable news distribution service. We help businesses reach 5000+ journalists, bloggers, and media points across national and regional networks.');
+    setTimeout(function() {
+      addMsg('bot', 'Whether you are a business owner, corporate, PR professional, or marketing agency — we have the right solution for you. Would you like to know about our services, pricing, or how to get started?');
+      chosenTopic = 'Media / PR Enquiry';
+      busy = false;
+    }, 500);
+  });
+}
+
+function handleThanks() {
+  const replies = [
+    'You\'re most welcome! Is there anything else I can help you with?',
+    'Happy to help! Feel free to ask if you have any other questions.',
+    'Glad I could assist! Let me know if there\'s anything else.',
+    'Anytime! Is there something else you\'d like to know?',
+    'Of course! Do let me know if you need any further assistance.'
+  ];
+  showTyping(function() { addMsg('bot', replies[Math.floor(Math.random() * replies.length)]); busy = false; });
+}
+
+function handleGoodbye() {
+  const replies = [
+    'Thank you for reaching out! Have a wonderful day.',
+    'It was a pleasure assisting you. Take care!',
+    'Goodbye! Feel free to come back anytime.',
+    'See you around! Have a great day.',
+    'Take care! We are always here if you need us.'
+  ];
+  showTyping(function() { addMsg('bot', replies[Math.floor(Math.random() * replies.length)]); busy = false; });
+}
+
+function handleUnknown() {
+  showTyping(function() {
+    addMsg('bot', 'Thank you for reaching out! I want to make sure you get the right help.');
+    setTimeout(function() {
+      addMsg('bot', 'Could you share your email address? Someone from our team will personally reach out to assist you with your query.');
+      awaitingEmail = true;
+      chosenTopic = 'General Enquiry';
+      busy = false;
+    }, 500);
+  });
+}
+
+function submitToBackend(name, email, phone, query) {
+  const payload = JSON.stringify({ name: name, email: email, phone: phone, query: query });
+  const base = window.CHATBOT_API_BASE || '';
+  fetch(base + '/submit-email', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload
+  }).catch(function() {});
+  fetch(base + '/submit-whatsapp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: payload
+  }).catch(function() {});
+}
+
+function handleInput() {
+  if (busy) return;
+  const val = txtIn.value.trim();
+  if (!val) return;
+  txtIn.value = '';
+  const lower = val.toLowerCase();
+
+  if (step === 1) {
+    addMsg('user', val);
+    const words = lower.replace(/[^a-z0-9\s]/g, '').split(/\s+/);
+    const isGreeting = words.some(function(w) { return GREETINGS.indexOf(w) !== -1; }) && words.length <= 3 && lower.indexOf('@') === -1;
+    if (isGreeting) {
+      busy = true;
+      showTyping(function() { addMsg('bot', 'Hello! Could you please share your name so I can assist you better?'); busy = false; });
+    } else {
+      userName = extractName(val);
+      busy = true;
+      showTyping(function() {
+        addMsg('bot', 'Great to meet you, ' + userName + '! How can I help you today? Feel free to ask me anything — about our pricing, releases, content policy, or anything else.');
+        step = 2;
+        busy = false;
+      });
+    }
+    return;
+  }
+
+  if (awaitingEmail) {
+    const skipWords = ['skip','no','nahi','nhi','nope','not now','later','no thanks','abhi nahi','nahi chahiye','dont want','private','privacy','not interested','i am not interested','interested nahi','nahi dena','nhi dena','na','naa','mat maango','mat puchho','rehne do','chhod do','leave it','never mind','nevermind','ignore','pass'];
+    const wantsSkip = skipWords.some(function(s) { return lower.indexOf(s) !== -1; });
+    if (wantsSkip && !val.includes('@')) {
+      awaitingEmail = false;
+      addMsg('user', val);
+      showTyping(function() {
+        addMsg('bot', 'No problem at all! Feel free to reach out anytime. Is there anything else I can help you with?');
+        busy = false;
+      });
+      return;
+    }
+    const emailFound = extractEmail(val);
+    if (emailFound && isValidEmail(emailFound)) {
+      emailCollected = emailFound;
+      awaitingEmail = false;
+      addMsg('user', val);
+      busy = true;
+      showTyping(function() {
+        addMsg('bot', 'Thank you! We have noted your email as ' + emailCollected + '.');
+        setTimeout(function() {
+          if (!phoneCollected) {
+            addMsg('bot', 'Would you also like to share a contact number? This helps our team reach you faster — though it is completely optional.');
+            awaitingPhone = true;
+          } else {
+            addMsg('bot', 'We already have all your details. Our team will reach out to you very soon!');
+          }
+          busy = false;
+        }, 500);
+      });
+    } else if (val.indexOf('@') !== -1) {
+      addMsg('user', val);
+      showTyping(function() { addMsg('bot', 'That email doesn\'t seem valid. Please make sure it\'s in the format: name@domain.com'); busy = false; });
+    } else {
+      addMsg('user', val);
+      showTyping(function() { addMsg('bot', 'To proceed, I\'ll need your email address. Please share it in the format: name@domain.com — or type skip if you prefer not to.'); busy = false; });
+    }
+    return;
+  }
+
+  if (awaitingPhone) {
+    const digitsOnly = val.replace(/[\s\-().+]/g, '');
+    const phoneFound = digitsOnly.match(/^\d{10,12}$/);
+    addMsg('user', val);
+    busy = true;
+    if (!phoneFound) {
+      const skipWords = ['skip','no','nahi','nhi','nope','not now','later','no thanks','abhi nahi','nahi chahiye','dont want','don\'t want','privacy','private'];
+      const wantsSkip = skipWords.some(function(s) { return lower.indexOf(s) !== -1; });
+      if (wantsSkip) {
+        awaitingPhone = false;
+        submitToBackend(userName, emailCollected, '', chosenTopic);
+        showTyping(function() {
+          addMsg('bot', 'No problem at all! Your enquiry has been noted and our team will reach out to you at ' + emailCollected + ' at the earliest. Feel free to ask if you have anything else!');
+          busy = false;
+        });
+        return;
+      }
+      showTyping(function() { addMsg('bot', 'That does not seem like a valid phone number. Please check and try again — or type skip if you would prefer not to share it.'); busy = false; });
+      return;
+    }
+    awaitingPhone = false;
+    phoneCollected = phoneFound[0];
+    submitToBackend(userName, emailCollected, phoneFound[0], chosenTopic);
+    showTyping(function() {
+      addMsg('bot', 'Thank you, ' + userName + '! All your details have been received.');
+      setTimeout(function() {
+        addMsg('bot', 'Our team will reach out to you very soon. We appreciate your time! Is there anything else I can help you with?');
+        busy = false;
+      }, 500);
+    });
+    return;
+  }
+
+  addMsg('user', val);
+  busy = true;
+  const intent = detectIntent(lower);
+  if (intent === 'who_uses') handleWhoUses();
+  else if (intent === 'benefits') handleBenefits();
+  else if (intent === 'reach') handleReach();
+  else if (intent === 'tracking') handleTracking();
+  else if (intent === 'multimedia') handleMultimedia();
+  else if (intent === 'distribution') handleDistribution();
+  else if (intent === 'testimonial') handleTestimonial();
+  else if (intent === 'social') handleSocial();
+  else if (intent === 'how_it_works') handleHowItWorks();
+  else if (intent === 'processing_time') handleProcessingTime();
+  else if (intent === 'writing_service') handleWritingService();
+  else if (intent === 'what_publish') handleWhatPublish();
+  else if (intent === 'seo') handleSEO();
+  else if (intent === 'prepare') handlePrepare();
+  else if (intent === 'media_monitoring') handleMediaMonitoring();
+  else if (intent === 'contact_email') handleContactEmail();
+  else if (intent === 'about') handleAbout();
+  else if (intent === 'capabilities') handleCapabilities();
+  else if (intent === 'pricing') handlePricing();
+  else if (intent === 'releases') handleReleases();
+  else if (intent === 'content') handleContent();
+  else if (intent === 'contact') handleContact();
+  else if (intent === 'media') handleMedia();
+  else if (intent === 'thanks') handleThanks();
+  else if (intent === 'goodbye') handleGoodbye();
+  else handleUnknown();
+}
+
+document.getElementById('notif-dot').classList.remove('hidden');
+</script>
+</body>
+</html>
